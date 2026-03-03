@@ -2,11 +2,11 @@
 <html lang="ku" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>لیستی هاتوچۆی ڕۆژانە</title>
+    <title>لیستی هاتوچۆی ڕۆژانە - وەشانی خێرا</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; direction: rtl; }
         .list-container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -16,6 +16,7 @@
         .time-tag { color: #7f8c8d; font-size: 13px; }
         .car-num { font-weight: bold; font-size: 18px; color: #2c3e50; }
         .line-name { color: #27ae60; font-weight: bold; }
+        .empty-msg { padding: 20px; text-align: center; color: #7f8c8d; }
     </style>
 </head>
 <body>
@@ -37,7 +38,6 @@
 </div>
 
 <script>
-    // هەمان کۆنفیگی فایەربەیسەکەی خۆت لێرە دابنێوە
     const firebaseConfig = {
         apiKey: "AIzaSyCuUstd-6d0E-EbmQipv2mWk-bA55ajpQ0",
         authDomain: "car-system-4594d.firebaseapp.com",
@@ -49,47 +49,68 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    async function loadTrips() {
+    let localTrips = []; // پاشەکەوتی ناوخۆیی بۆ کەمکردنەوەی تێچوو
+
+    function startListening() {
         const today = new Date().toLocaleDateString('en-CA');
+        
+        // بەکارهێنانی onSnapshot بۆ ئەوەی هەر وەسڵێکی نوێ هات یەکسەر دەربکەوێت
+        db.collection("Invoices")
+          .where("searchDate", "==", today)
+          .onSnapshot((snapshot) => {
+              
+              snapshot.docChanges().forEach((change) => {
+                  const data = change.doc.data();
+                  const id = change.doc.id;
+
+                  if (change.type === "added") {
+                      // فلتەرکردنی پارکینگ و دڵنیابوونەوە لەوەی دووبارە نییە
+                      if (!data.isParking && !localTrips.find(t => t.id === id)) {
+                          localTrips.push({ id, ...data });
+                      }
+                  }
+                  if (change.type === "removed") {
+                      localTrips = localTrips.filter(t => t.id !== id);
+                  }
+              });
+
+              renderTable();
+          }, (error) => {
+              console.error("Error fetching trips: ", error);
+          });
+    }
+
+    function renderTable() {
         const tbody = document.getElementById('trip-table-body');
         
-        // وەرگرتنی وەسڵەکان
-        const snap = await db.collection("Invoices")
-                             .where("searchDate", "==", today)
-                             .get();
-
-        let trips = [];
-        snap.forEach(doc => {
-            const d = doc.data();
-            // فلتەرکردنی پارکینگ - ئەگەر پارکینگ بوو پیشانی نادات
-            if (!d.isParking) {
-                trips.push(d);
-            }
+        // ڕیزکردن بەپێی کات (نوێترین لە سەرەوە)
+        const sortedTrips = [...localTrips].sort((a, b) => {
+            const timeA = a.timestamp?.seconds || 0;
+            const timeB = b.timestamp?.seconds || 0;
+            return timeB - timeA;
         });
 
-        // ڕیزکردن بەپێی کات
-        trips.sort((a, b) => b.timestamp - a.timestamp);
+        if (sortedTrips.length === 0) {
+            tbody.innerHTML = "<tr><td colspan='4' class='empty-msg'>هیچ گەشتێک بۆ ئەمڕۆ تۆمار نەکراوە</td></tr>";
+            return;
+        }
 
         tbody.innerHTML = "";
-        trips.forEach(t => {
+        sortedTrips.forEach(t => {
+            const timeDisplay = t.date?.split(',')[1] || t.date || "";
             tbody.innerHTML += `
                 <tr>
-                    <td class="time-tag">${t.date.split(',')[1] || t.date}</td>
+                    <td class="time-tag">${timeDisplay}</td>
                     <td class="car-num">${t.carNumber}</td>
                     <td class="line-name">${t.line}</td>
                     <td>${t.employee}</td>
                 </tr>
             `;
         });
-        
-        if (trips.length === 0) {
-            tbody.innerHTML = "<tr><td colspan='4'>هیچ گەشتێک بۆ ئەمڕۆ تۆمار نەکراوە</td></tr>";
-        }
     }
 
-    // هەموو 30 چرکەیەک لاپەڕەکە نوێ دەبێتەوە بۆ بینینی وەسڵە نوێیەکان
-    loadTrips();
-    setInterval(loadTrips, 30000);
+    // دەستپێکردنی گوێگرتن لە داتاکان
+    startListening();
 </script>
 
 </body>
