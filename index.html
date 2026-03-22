@@ -2,7 +2,7 @@
 <html lang="ku" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>لیستی هاتوچۆی ڕۆژانە - وەشانی خێرا</title>
+    <title>لیستی هاتوچۆی ڕۆژانە - وەشانی نوێ</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
@@ -29,32 +29,36 @@
                 <th>کات</th>
                 <th>ژمارەی ئۆتۆمبێل</th>
                 <th>هێڵ</th>
-                <th>ناوەی کارمەند</th>
+                <th>ناوی کارمەند</th>
             </tr>
         </thead>
-        <tbody id="trip-table-body">
-            </tbody>
+        <tbody id="trip-table-body"></tbody>
     </table>
 </div>
 
 <script>
+    // لێرەدا زانیارییە نوێیەکانی تۆ (sysam-k) جێگیر کراوە
     const firebaseConfig = {
-        apiKey: "AIzaSyCuUstd-6d0E-EbmQipv2mWk-bA55ajpQ0",
-        authDomain: "car-system-4594d.firebaseapp.com",
-        projectId: "car-system-4594d",
-        storageBucket: "car-system-4594d.firebasestorage.app",
-        messagingSenderId: "719030469585",
-        appId: "1:719030469585:web:7a23645b9e684b727dd6f0"
+        apiKey: "AIzaSyAMI84_IuKUZVqc8ImMW7eahru20cTkjFM",
+        authDomain: "sysam-k.firebaseapp.com",
+        projectId: "sysam-k",
+        storageBucket: "sysam-k.firebasestorage.app",
+        messagingSenderId: "905972435434",
+        appId: "1:905972435434:web:2501e11240523f8368ca93",
+        measurementId: "G-43PT1ZPMX2"
     };
-    firebase.initializeApp(firebaseConfig);
+
+    // Initialize Firebase
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
     const db = firebase.firestore();
 
-    let localTrips = []; // پاشەکەوتی ناوخۆیی بۆ کەمکردنەوەی تێچوو
+    let localTrips = [];
 
     function startListening() {
         const today = new Date().toLocaleDateString('en-CA');
         
-        // بەکارهێنانی onSnapshot بۆ ئەوەی هەر وەسڵێکی نوێ هات یەکسەر دەربکەوێت
         db.collection("Invoices")
           .where("searchDate", "==", today)
           .onSnapshot((snapshot) => {
@@ -71,6 +75,10 @@
                   }
                   if (change.type === "removed") {
                       localTrips = localTrips.filter(t => t.id !== id);
+                  }
+                  if (change.type === "modified") {
+                      const index = localTrips.findIndex(t => t.id === id);
+                      if (index !== -1) localTrips[index] = { id, ...data };
                   }
               });
 
@@ -91,7 +99,7 @@
         });
 
         if (sortedTrips.length === 0) {
-            tbody.innerHTML = "<tr><td colspan='4' class='empty-msg'>هیچ گەشتێک بۆ ئەمڕۆ تۆمار نەکراوە</td></tr>";
+            tbody.innerHTML = "<tr><td colspan='4' class='empty-msg'>هیچ گەشتێک بۆ ئەمڕۆ لە سێرڤەری نوێ تۆمار نەکراوە</td></tr>";
             return;
         }
 
@@ -103,13 +111,13 @@
                     <td class="time-tag">${timeDisplay}</td>
                     <td class="car-num">${t.carNumber}</td>
                     <td class="line-name">${t.line}</td>
-                    <td>${t.employee}</td>
+                    <td>${t.employee || "---"}</td>
                 </tr>
             `;
         });
     }
 
-    // دەستپێکردنی گوێگرتن لە داتاکان
+    // دەستپێکردنی گوێگرتن
     startListening();
 </script>
 
