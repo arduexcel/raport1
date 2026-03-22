@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ku" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>لیستی هاتوچۆی ڕۆژانە - وەشانی نوێ</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; direction: rtl; }
+        .list-container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 15px; text-align: center; border-bottom: 1px solid #eee; }
+        th { background-color: #3498db; color: white; font-size: 16px; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .time-tag { color: #7f8c8d; font-size: 13px; }
+        .car-num { font-weight: bold; font-size: 18px; color: #2c3e50; }
+        .line-name { color: #27ae60; font-weight: bold; }
+        .empty-msg { padding: 20px; text-align: center; color: #7f8c8d; }
+    </style>
+</head>
+<body>
+
+<div class="list-container">
+    <h2>لیستی گەشتەکانی ئەمڕۆ</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>کات</th>
+                <th>ژمارەی ئۆتۆمبێل</th>
+                <th>هێڵ</th>
+                <th>ناوی کارمەند</th>
+            </tr>
+        </thead>
+        <tbody id="trip-table-body"></tbody>
+    </table>
+</div>
+
+<script>
+    // لێرەدا زانیارییە نوێیەکانی تۆ (sysam-k) جێگیر کراوە
+    const firebaseConfig = {
+        apiKey: "AIzaSyAMI84_IuKUZVqc8ImMW7eahru20cTkjFM",
+        authDomain: "sysam-k.firebaseapp.com",
+        projectId: "sysam-k",
+        storageBucket: "sysam-k.firebasestorage.app",
+        messagingSenderId: "905972435434",
+        appId: "1:905972435434:web:2501e11240523f8368ca93",
+        measurementId: "G-43PT1ZPMX2"
+    };
+
+    // Initialize Firebase
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+
+    let localTrips = [];
+
+    function startListening() {
+        const today = new Date().toLocaleDateString('en-CA');
+        
+        db.collection("Invoices")
+          .where("searchDate", "==", today)
+          .onSnapshot((snapshot) => {
+              
+              snapshot.docChanges().forEach((change) => {
+                  const data = change.doc.data();
+                  const id = change.doc.id;
+
+                  if (change.type === "added") {
+                      // فلتەرکردنی پارکینگ و دڵنیابوونەوە لەوەی دووبارە نییە
+                      if (!data.isParking && !localTrips.find(t => t.id === id)) {
+                          localTrips.push({ id, ...data });
+                      }
+                  }
+                  if (change.type === "removed") {
+                      localTrips = localTrips.filter(t => t.id !== id);
+                  }
+                  if (change.type === "modified") {
+                      const index = localTrips.findIndex(t => t.id === id);
+                      if (index !== -1) localTrips[index] = { id, ...data };
+                  }
+              });
+
+              renderTable();
+          }, (error) => {
+              console.error("Error fetching trips: ", error);
+          });
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('trip-table-body');
+        
+        // ڕیزکردن بەپێی کات (نوێترین لە سەرەوە)
+        const sortedTrips = [...localTrips].sort((a, b) => {
+            const timeA = a.timestamp?.seconds || 0;
+            const timeB = b.timestamp?.seconds || 0;
+            return timeB - timeA;
+        });
+
+        if (sortedTrips.length === 0) {
+            tbody.innerHTML = "<tr><td colspan='4' class='empty-msg'>هیچ گەشتێک بۆ ئەمڕۆ لە سێرڤەری نوێ تۆمار نەکراوە</td></tr>";
+            return;
+        }
+
+        tbody.innerHTML = "";
+        sortedTrips.forEach(t => {
+            const timeDisplay = t.date?.split(',')[1] || t.date || "";
+            tbody.innerHTML += `
+                <tr>
+                    <td class="time-tag">${timeDisplay}</td>
+                    <td class="car-num">${t.carNumber}</td>
+                    <td class="line-name">${t.line}</td>
+                    <td>${t.employee || "---"}</td>
+                </tr>
+            `;
+        });
+    }
+
+    // دەستپێکردنی گوێگرتن
+    startListening();
+</script>
+
+</body>
+</html>
